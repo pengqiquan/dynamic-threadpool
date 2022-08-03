@@ -17,18 +17,19 @@
 
 package cn.hippo4j.core.springboot.starter.notify;
 
-import cn.hippo4j.common.api.NotifyConfigBuilder;
-import cn.hippo4j.common.notify.AlarmControlHandler;
-import cn.hippo4j.common.notify.NotifyConfigDTO;
 import cn.hippo4j.common.toolkit.CollectionUtil;
 import cn.hippo4j.common.toolkit.StringUtil;
 import cn.hippo4j.core.springboot.starter.config.BootstrapCoreProperties;
 import cn.hippo4j.core.springboot.starter.config.ExecutorProperties;
 import cn.hippo4j.core.springboot.starter.config.NotifyPlatformProperties;
+import cn.hippo4j.message.service.AlarmControlHandler;
+import cn.hippo4j.message.dto.NotifyConfigDTO;
+import cn.hippo4j.message.api.NotifyConfigBuilder;
 import cn.hutool.core.util.StrUtil;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ import java.util.stream.Collectors;
  * @date 2022/2/25 00:24
  */
 @AllArgsConstructor
+@Slf4j
 public class CoreNotifyConfigBuilder implements NotifyConfigBuilder {
 
     private final AlarmControlHandler alarmControlHandler;
@@ -53,14 +55,18 @@ public class CoreNotifyConfigBuilder implements NotifyConfigBuilder {
         Map<String, List<NotifyConfigDTO>> resultMap = Maps.newHashMap();
         boolean globalAlarm = bootstrapCoreProperties.getAlarm();
         List<ExecutorProperties> executors = bootstrapCoreProperties.getExecutors();
+        if (CollectionUtil.isEmpty(executors)) {
+            log.warn("Failed to build notify, executors configuration is empty.");
+            return resultMap;
+        }
         List<ExecutorProperties> actual = executors.stream().filter(each -> Optional.ofNullable(each.getNotify()).map(notify -> notify.getIsAlarm()).orElse(false)).collect(Collectors.toList());
         if (!globalAlarm && CollectionUtil.isEmpty(actual)) {
             return resultMap;
         }
-        if (CollectionUtil.isNotEmpty(executors)) {
-            for (ExecutorProperties executor : executors) {
-                resultMap.putAll(buildSingleNotifyConfig(executor));
-            }
+        for (ExecutorProperties executor : executors) {
+            Map<String, List<NotifyConfigDTO>> buildSingleNotifyConfig = buildSingleNotifyConfig(executor);
+            initCacheAndLock(buildSingleNotifyConfig);
+            resultMap.putAll(buildSingleNotifyConfig);
         }
         return resultMap;
     }
@@ -76,7 +82,6 @@ public class CoreNotifyConfigBuilder implements NotifyConfigBuilder {
         String threadPoolId = executor.getThreadPoolId();
         String alarmBuildKey = threadPoolId + "+ALARM";
         List<NotifyConfigDTO> alarmNotifyConfigs = Lists.newArrayList();
-
         List<NotifyPlatformProperties> notifyPlatforms = bootstrapCoreProperties.getNotifyPlatforms();
         for (NotifyPlatformProperties platformProperties : notifyPlatforms) {
             NotifyConfigDTO notifyConfig = new NotifyConfigDTO();
@@ -93,10 +98,8 @@ public class CoreNotifyConfigBuilder implements NotifyConfigBuilder {
             alarmNotifyConfigs.add(notifyConfig);
         }
         resultMap.put(alarmBuildKey, alarmNotifyConfigs);
-
         String changeBuildKey = threadPoolId + "+CONFIG";
         List<NotifyConfigDTO> changeNotifyConfigs = Lists.newArrayList();
-
         for (NotifyPlatformProperties platformProperties : notifyPlatforms) {
             NotifyConfigDTO notifyConfig = new NotifyConfigDTO();
             notifyConfig.setPlatform(platformProperties.getPlatform());
@@ -108,13 +111,14 @@ public class CoreNotifyConfigBuilder implements NotifyConfigBuilder {
             changeNotifyConfigs.add(notifyConfig);
         }
         resultMap.put(changeBuildKey, changeNotifyConfigs);
+        return resultMap;
+    }
 
-        resultMap.forEach(
+    public void initCacheAndLock(Map<String, List<NotifyConfigDTO>> buildSingleNotifyConfig) {
+        buildSingleNotifyConfig.forEach(
                 (key, val) -> val.stream()
                         .filter(each -> StrUtil.equals("ALARM", each.getType()))
                         .forEach(each -> alarmControlHandler.initCacheAndLock(each.getTpId(), each.getPlatform(), each.getInterval())));
-
-        return resultMap;
     }
 
     private String buildReceive(ExecutorProperties executor, NotifyPlatformProperties platformProperties) {

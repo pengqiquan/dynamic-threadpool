@@ -17,7 +17,10 @@
 
 package cn.hippo4j.config.model.biz.notify;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+
+import java.util.Date;
 
 /**
  * 消息通知返回.
@@ -32,6 +35,11 @@ public class NotifyRespDTO {
      * id
      */
     private String id;
+
+    /**
+     * ids
+     */
+    private String ids;
 
     /**
      * 租户id
@@ -59,6 +67,16 @@ public class NotifyRespDTO {
     private String type;
 
     /**
+     * 配置变更通知类型
+     */
+    private Boolean configType;
+
+    /**
+     * 报警消息通知
+     */
+    private Boolean alarmType;
+
+    /**
      * 密钥
      */
     private String secretKey;
@@ -78,4 +96,15 @@ public class NotifyRespDTO {
      */
     private Integer enable;
 
+    /**
+     * 创建时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private Date gmtCreate;
+
+    /**
+     * 修改时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private Date gmtModified;
 }

@@ -7,10 +7,7 @@
         <artifactId>hippo4j-all</artifactId>
         <version>${revision}</version>
     </parent>
-
     <artifactId>hippo4j-core</artifactId>
-    <packaging>jar</packaging>
-    <name>${project.artifactId}</name>
 
     <dependencies>
         <dependency>
@@ -24,6 +21,11 @@
         </dependency>
 
         <dependency>
+            <groupId>cn.hippo4j</groupId>
+            <artifactId>hippo4j-message</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>alibaba-dingtalk-service-sdk</artifactId>
             <!-- 用户反馈其中 javax.jms 无法下载, 未发现 log4j 用处, 暂且排除 -->
@@ -33,31 +35,6 @@
                     <artifactId>log4j</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-core</artifactId>
-            <version>${tomcat-embed-core.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-tomcat</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-jetty</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-undertow</artifactId>
-            <optional>true</optional>
         </dependency>
     </dependencies>
 
@@ -77,7 +54,6 @@
                     </archive>
                 </configuration>
             </plugin>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>

@@ -17,67 +17,53 @@
 
 package cn.hippo4j.core.springboot.starter.config;
 
-import cn.hippo4j.common.api.NotifyConfigBuilder;
 import cn.hippo4j.common.config.ApplicationContextHolder;
-import cn.hippo4j.common.notify.AlarmControlHandler;
-import cn.hippo4j.common.notify.HippoBaseSendMessageService;
-import cn.hippo4j.common.notify.HippoSendMessageService;
-import cn.hippo4j.common.notify.SendMessageHandler;
-import cn.hippo4j.common.notify.platform.DingSendMessageHandler;
-import cn.hippo4j.common.notify.platform.LarkSendMessageHandler;
-import cn.hippo4j.common.notify.platform.WeChatSendMessageHandler;
 import cn.hippo4j.core.config.UtilAutoConfiguration;
-import cn.hippo4j.core.config.WebThreadPoolConfiguration;
 import cn.hippo4j.core.enable.MarkerConfiguration;
 import cn.hippo4j.core.executor.ThreadPoolNotifyAlarmHandler;
-import cn.hippo4j.core.executor.state.ThreadPoolRunStateHandler;
 import cn.hippo4j.core.handler.DynamicThreadPoolBannerHandler;
 import cn.hippo4j.core.springboot.starter.monitor.DynamicThreadPoolMonitorExecutor;
-import cn.hippo4j.core.springboot.starter.monitor.LogMonitorHandler;
-import cn.hippo4j.core.springboot.starter.monitor.MetricMonitorHandler;
 import cn.hippo4j.core.springboot.starter.notify.CoreNotifyConfigBuilder;
-import cn.hippo4j.core.springboot.starter.refresher.ApolloRefresherHandler;
-import cn.hippo4j.core.springboot.starter.refresher.NacosCloudRefresherHandler;
-import cn.hippo4j.core.springboot.starter.refresher.NacosRefresherHandler;
-import cn.hippo4j.core.springboot.starter.refresher.ZookeeperRefresherHandler;
 import cn.hippo4j.core.springboot.starter.refresher.event.AdapterExecutorsListener;
 import cn.hippo4j.core.springboot.starter.refresher.event.ExecutorsListener;
 import cn.hippo4j.core.springboot.starter.refresher.event.PlatformsListener;
 import cn.hippo4j.core.springboot.starter.refresher.event.WebExecutorListener;
 import cn.hippo4j.core.springboot.starter.support.DynamicThreadPoolPostProcessor;
 import cn.hippo4j.core.springboot.starter.support.ThreadPoolAdapterRegister;
+import cn.hippo4j.message.api.NotifyConfigBuilder;
+import cn.hippo4j.message.config.MessageConfiguration;
+import cn.hippo4j.message.service.AlarmControlHandler;
+import cn.hippo4j.message.service.Hippo4jBaseSendMessageService;
+import cn.hippo4j.message.service.Hippo4jSendMessageService;
 import lombok.AllArgsConstructor;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 
 /**
- * Dynamic thread-pool auto configuration.
- *
- * @author chen.ma
- * @date 2022/2/25 00:21
+ * Dynamic thread-pool core auto-configuration.
  */
 @Configuration
 @AllArgsConstructor
 @ConditionalOnBean(MarkerConfiguration.Marker.class)
 @EnableConfigurationProperties(BootstrapCoreProperties.class)
-@ImportAutoConfiguration({UtilAutoConfiguration.class, WebThreadPoolConfiguration.class})
+@ImportAutoConfiguration({UtilAutoConfiguration.class, MessageConfiguration.class})
 @ConditionalOnProperty(prefix = BootstrapCoreProperties.PREFIX, value = "enable", matchIfMissing = true, havingValue = "true")
+@Import({
+        ConfigHandlerConfiguration.EmbeddedNacos.class, ConfigHandlerConfiguration.EmbeddedNacosCloud.class,
+        ConfigHandlerConfiguration.EmbeddedApollo.class, ConfigHandlerConfiguration.EmbeddedZookeeper.class,
+        MonitorHandlerConfiguration.EmbeddedLogMonitor.class, MonitorHandlerConfiguration.EmbeddedPrometheusMonitor.class
+})
 public class DynamicThreadPoolCoreAutoConfiguration {
 
     private final BootstrapCoreProperties bootstrapCoreProperties;
-
-    private static final String NACOS_CONFIG_MANAGER_KEY = "com.alibaba.cloud.nacos.NacosConfigManager";
-
-    private static final String NACOS_CONFIG_KEY = "com.alibaba.nacos.api.config.ConfigService";
-
-    private static final String APOLLO_CONFIG_KEY = "com.ctrip.framework.apollo.ConfigService";
-
-    private static final String ZK_CONFIG_KEY = "org.apache.curator.framework.CuratorFramework";
 
     @Bean
     @ConditionalOnMissingBean
@@ -87,39 +73,13 @@ public class DynamicThreadPoolCoreAutoConfiguration {
     }
 
     @Bean
-    public AlarmControlHandler alarmControlHandler() {
-        return new AlarmControlHandler();
-    }
-
-    @Bean
     public NotifyConfigBuilder notifyConfigBuilder(AlarmControlHandler alarmControlHandler) {
         return new CoreNotifyConfigBuilder(alarmControlHandler, bootstrapCoreProperties);
     }
 
     @Bean
-    public HippoSendMessageService hippoSendMessageService(NotifyConfigBuilder notifyConfigBuilder,
-                                                           AlarmControlHandler alarmControlHandler) {
-        return new HippoBaseSendMessageService(notifyConfigBuilder, alarmControlHandler);
-    }
-
-    @Bean
-    public ThreadPoolNotifyAlarmHandler threadPoolNotifyAlarmHandler(HippoSendMessageService hippoSendMessageService) {
+    public ThreadPoolNotifyAlarmHandler threadPoolNotifyAlarmHandler(Hippo4jSendMessageService hippoSendMessageService) {
         return new ThreadPoolNotifyAlarmHandler(hippoSendMessageService);
-    }
-
-    @Bean
-    public SendMessageHandler dingSendMessageHandler() {
-        return new DingSendMessageHandler();
-    }
-
-    @Bean
-    public SendMessageHandler larkSendMessageHandler() {
-        return new LarkSendMessageHandler();
-    }
-
-    @Bean
-    public SendMessageHandler weChatSendMessageHandler() {
-        return new WeChatSendMessageHandler();
     }
 
     @Bean
@@ -128,52 +88,16 @@ public class DynamicThreadPoolCoreAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnClass(name = NACOS_CONFIG_KEY)
-    @ConditionalOnMissingClass(NACOS_CONFIG_MANAGER_KEY)
-    @ConditionalOnProperty(prefix = BootstrapCoreProperties.PREFIX, name = "nacos.data-id")
-    public NacosRefresherHandler nacosRefresherHandler() {
-        return new NacosRefresherHandler(bootstrapCoreProperties);
-    }
-
-    @Bean
-    @ConditionalOnClass(name = NACOS_CONFIG_MANAGER_KEY)
-    @ConditionalOnProperty(prefix = BootstrapCoreProperties.PREFIX, name = "nacos.data-id")
-    public NacosCloudRefresherHandler nacosCloudRefresherHandler() {
-        return new NacosCloudRefresherHandler();
-    }
-
-    @Bean
-    @ConditionalOnClass(name = APOLLO_CONFIG_KEY)
-    @ConditionalOnProperty(prefix = BootstrapCoreProperties.PREFIX, name = "apollo.namespace")
-    public ApolloRefresherHandler apolloRefresher() {
-        return new ApolloRefresherHandler();
-    }
-
-    @Bean
-    @ConditionalOnClass(name = ZK_CONFIG_KEY)
-    @ConditionalOnProperty(prefix = BootstrapCoreProperties.PREFIX, name = "zookeeper.zk-connect-str")
-    public ZookeeperRefresherHandler zookeeperRefresher() {
-        return new ZookeeperRefresherHandler();
-    }
-
-    @Bean
     public DynamicThreadPoolMonitorExecutor hippo4jDynamicThreadPoolMonitorExecutor() {
         return new DynamicThreadPoolMonitorExecutor(bootstrapCoreProperties);
     }
 
     @Bean
-    public LogMonitorHandler hippo4jLogMonitorHandler(ThreadPoolRunStateHandler threadPoolRunStateHandler) {
-        return new LogMonitorHandler(threadPoolRunStateHandler);
-    }
-
-    @Bean
-    public MetricMonitorHandler hippo4jMetricMonitorHandler(ThreadPoolRunStateHandler threadPoolRunStateHandler) {
-        return new MetricMonitorHandler(threadPoolRunStateHandler);
-    }
-
-    @Bean
-    public ExecutorsListener hippo4jExecutorsListener(ThreadPoolNotifyAlarmHandler threadPoolNotifyAlarmHandler) {
-        return new ExecutorsListener(threadPoolNotifyAlarmHandler);
+    @SuppressWarnings("all")
+    public ExecutorsListener hippo4jExecutorsListener(ThreadPoolNotifyAlarmHandler threadPoolNotifyAlarmHandler,
+                                                      CoreNotifyConfigBuilder coreNotifyConfigBuilder,
+                                                      Hippo4jBaseSendMessageService hippoBaseSendMessageService) {
+        return new ExecutorsListener(threadPoolNotifyAlarmHandler, coreNotifyConfigBuilder, hippoBaseSendMessageService);
     }
 
     @Bean
@@ -196,10 +120,6 @@ public class DynamicThreadPoolCoreAutoConfiguration {
         return new ThreadPoolAdapterRegister(bootstrapCoreProperties);
     }
 
-    /**
-     * banner config
-     * @return DynamicThreadPoolBannerHandler
-     */
     @Bean
     public DynamicThreadPoolBannerHandler threadPoolBannerHandler() {
         return new DynamicThreadPoolBannerHandler(bootstrapCoreProperties);

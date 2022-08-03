@@ -7,10 +7,7 @@
         <artifactId>hippo4j-all</artifactId>
         <version>${revision}</version>
     </parent>
-
     <artifactId>hippo4j-common</artifactId>
-    <packaging>jar</packaging>
-    <name>${project.artifactId}</name>
 
     <dependencies>
         <dependency>
@@ -36,25 +33,6 @@
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.aliyun</groupId>
-            <artifactId>alibaba-dingtalk-service-sdk</artifactId>
-            <optional>true</optional>
-            <!-- 用户反馈其中 javax.jms 无法下载, 未发现 log4j 用处, 暂且排除 -->
-            <exclusions>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>log4j</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <dependency>
-            <groupId>commons-codec</groupId>
-            <artifactId>commons-codec</artifactId>
-            <version>1.14</version>
         </dependency>
     </dependencies>
 

@@ -17,7 +17,7 @@
 
 package cn.hippo4j.core.executor.manage;
 
-import cn.hippo4j.common.notify.ThreadPoolNotifyAlarm;
+import cn.hippo4j.message.service.ThreadPoolNotifyAlarm;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

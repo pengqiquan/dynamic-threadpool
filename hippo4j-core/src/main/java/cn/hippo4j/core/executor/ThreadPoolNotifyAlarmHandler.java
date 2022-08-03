@@ -17,18 +17,18 @@
 
 package cn.hippo4j.core.executor;
 
-import cn.hippo4j.common.notify.HippoSendMessageService;
-import cn.hippo4j.common.notify.NotifyTypeEnum;
-import cn.hippo4j.common.notify.ThreadPoolNotifyAlarm;
-import cn.hippo4j.common.notify.request.AlarmNotifyRequest;
-import cn.hippo4j.common.notify.request.ChangeParameterNotifyRequest;
-import cn.hippo4j.core.toolkit.TraceContextUtil;
+import cn.hippo4j.common.toolkit.CalculateUtil;
 import cn.hippo4j.common.toolkit.StringUtil;
 import cn.hippo4j.core.executor.manage.GlobalNotifyAlarmManage;
 import cn.hippo4j.core.executor.manage.GlobalThreadPoolManage;
 import cn.hippo4j.core.executor.support.ThreadPoolBuilder;
-import cn.hippo4j.core.toolkit.CalculateUtil;
 import cn.hippo4j.core.toolkit.IdentifyUtil;
+import cn.hippo4j.core.toolkit.TraceContextUtil;
+import cn.hippo4j.message.service.Hippo4jSendMessageService;
+import cn.hippo4j.message.enums.NotifyTypeEnum;
+import cn.hippo4j.message.service.ThreadPoolNotifyAlarm;
+import cn.hippo4j.message.request.AlarmNotifyRequest;
+import cn.hippo4j.message.request.ChangeParameterNotifyRequest;
 import cn.hutool.core.util.StrUtil;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +51,7 @@ import java.util.concurrent.*;
 public class ThreadPoolNotifyAlarmHandler implements Runnable, CommandLineRunner {
 
     @NonNull
-    private final HippoSendMessageService hippoSendMessageService;
+    private final Hippo4jSendMessageService hippoSendMessageService;
 
     @Value("${spring.profiles.active:UNKNOWN}")
     private String active;

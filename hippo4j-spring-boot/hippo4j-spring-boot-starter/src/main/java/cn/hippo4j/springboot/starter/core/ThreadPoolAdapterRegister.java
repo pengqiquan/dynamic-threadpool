@@ -17,10 +17,7 @@
 
 package cn.hippo4j.springboot.starter.core;
 
-import cn.hippo4j.adapter.base.ThreadPoolAdapter;
-import cn.hippo4j.adapter.base.ThreadPoolAdapterCacheConfig;
-import cn.hippo4j.adapter.base.ThreadPoolAdapterScheduler;
-import cn.hippo4j.adapter.base.ThreadPoolAdapterState;
+import cn.hippo4j.adapter.base.*;
 import cn.hippo4j.common.config.ApplicationContextHolder;
 import cn.hippo4j.common.toolkit.CollectionUtil;
 import cn.hippo4j.common.web.base.Result;
@@ -51,8 +48,7 @@ import static cn.hippo4j.common.constant.Constants.REGISTER_ADAPTER_PATH;
  */
 @Slf4j
 @AllArgsConstructor
-@RequiredArgsConstructor
-public class ThreadPoolAdapterRegister implements ApplicationRunner {
+public class ThreadPoolAdapterRegister implements ApplicationRunner, ThreadPoolAdapterRegisterAction {
 
     private final HttpAgent httpAgent;
 
@@ -62,25 +58,19 @@ public class ThreadPoolAdapterRegister implements ApplicationRunner {
 
     private final InetUtils hippo4JInetUtils;
 
-    private final ThreadPoolAdapterScheduler threadPoolAdapterScheduler;
-
-    private List<ThreadPoolAdapterCacheConfig> cacheConfigList = Lists.newArrayList();
-
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        ScheduledExecutorService scheduler = threadPoolAdapterScheduler.getScheduler();
-        int taskIntervalSeconds = threadPoolAdapterScheduler.getTaskIntervalSeconds();
-        ThreadPoolAdapterRegisterTask threadPoolAdapterRegisterTask = new ThreadPoolAdapterRegisterTask(scheduler, taskIntervalSeconds);
-        scheduler.schedule(threadPoolAdapterRegisterTask, threadPoolAdapterScheduler.getTaskIntervalSeconds(), TimeUnit.SECONDS);
+        register();
     }
 
-    public List<ThreadPoolAdapterCacheConfig> getThreadPoolAdapterCacheConfigs() {
-        Map<String, ThreadPoolAdapter> threadPoolAdapterMap = ApplicationContextHolder.getBeansOfType(ThreadPoolAdapter.class);
+    @Override
+    public List<ThreadPoolAdapterCacheConfig> getThreadPoolAdapterCacheConfigs(Map<String, ThreadPoolAdapter> threadPoolAdapterMap) {
         List<ThreadPoolAdapterCacheConfig> cacheConfigList = Lists.newArrayList();
-        threadPoolAdapterMap.forEach((key, val) -> {
+        for (Map.Entry<String, ThreadPoolAdapter> threadPoolAdapterEntry : threadPoolAdapterMap.entrySet()) {
+            ThreadPoolAdapter val = threadPoolAdapterEntry.getValue();
             List<ThreadPoolAdapterState> threadPoolStates = val.getThreadPoolStates();
-            if (CollectionUtil.isEmpty(threadPoolStates)) {
-                return;
+            if (CollectionUtil.isEmpty(threadPoolStates) || threadPoolStates.size() == 0) {
+                continue;
             }
             ThreadPoolAdapterCacheConfig cacheConfig = new ThreadPoolAdapterCacheConfig();
             cacheConfig.setMark(val.mark());
@@ -91,12 +81,13 @@ public class ThreadPoolAdapterRegister implements ApplicationRunner {
             cacheConfig.setClientAddress(clientAddress);
             cacheConfig.setThreadPoolAdapterStates(threadPoolStates);
             cacheConfigList.add(cacheConfig);
-        });
+        }
         return cacheConfigList;
     }
 
+    @Override
     public void doRegister(List<ThreadPoolAdapterCacheConfig> cacheConfigList) {
-        if (CollectionUtil.isNotEmpty(cacheConfigList)) {
+        if (CollectionUtil.isNotEmpty(cacheConfigList) && cacheConfigList.size() > 0) {
             try {
                 Result result = httpAgent.httpPost(REGISTER_ADAPTER_PATH, cacheConfigList);
                 if (!result.isSuccess()) {
@@ -109,63 +100,8 @@ public class ThreadPoolAdapterRegister implements ApplicationRunner {
     }
 
     public void register() {
-        List<ThreadPoolAdapterCacheConfig> threadPoolAdapterCacheConfigs = getThreadPoolAdapterCacheConfigs();
+        Map<String, ThreadPoolAdapter> threadPoolAdapterMap = ApplicationContextHolder.getBeansOfType(ThreadPoolAdapter.class);
+        List<ThreadPoolAdapterCacheConfig> threadPoolAdapterCacheConfigs = getThreadPoolAdapterCacheConfigs(threadPoolAdapterMap);
         doRegister(threadPoolAdapterCacheConfigs);
-    }
-
-    class ThreadPoolAdapterRegisterTask implements Runnable {
-
-        private ScheduledExecutorService scheduler;
-
-        private int taskIntervalSeconds;
-
-        public ThreadPoolAdapterRegisterTask(ScheduledExecutorService scheduler, int taskIntervalSeconds) {
-            this.scheduler = scheduler;
-            this.taskIntervalSeconds = taskIntervalSeconds;
-        }
-
-        @Override
-        public void run() {
-            try {
-                List<ThreadPoolAdapterCacheConfig> newThreadPoolAdapterCacheConfigs = getThreadPoolAdapterCacheConfigs();
-                boolean registerFlag = compareThreadPoolAdapterCacheConfigs(newThreadPoolAdapterCacheConfigs, cacheConfigList);
-                cacheConfigList = newThreadPoolAdapterCacheConfigs;
-                if (registerFlag) {
-                    doRegister(cacheConfigList);
-                }
-            } catch (Exception e) {
-                log.error("Register Task Error", e);
-            } finally {
-                if (!scheduler.isShutdown()) {
-                    scheduler.schedule(this, taskIntervalSeconds, TimeUnit.MILLISECONDS);
-                }
-            }
-        }
-    }
-
-    private boolean compareThreadPoolAdapterCacheConfigs(List<ThreadPoolAdapterCacheConfig> newThreadPoolAdapterCacheConfigs,
-                                                         List<ThreadPoolAdapterCacheConfig> oldThreadPoolAdapterCacheConfigs) {
-        boolean registerFlag = false;
-        Map<String, List<ThreadPoolAdapterState>> newThreadPoolAdapterCacheConfigMap =
-                newThreadPoolAdapterCacheConfigs.stream().collect(Collectors.toMap(
-                        ThreadPoolAdapterCacheConfig::getMark, ThreadPoolAdapterCacheConfig::getThreadPoolAdapterStates, (k1, k2) -> k2));
-        Map<String, List<ThreadPoolAdapterState>> oldThreadPoolAdapterCacheConfigMap =
-                oldThreadPoolAdapterCacheConfigs.stream().collect(Collectors.toMap(
-                        ThreadPoolAdapterCacheConfig::getMark, ThreadPoolAdapterCacheConfig::getThreadPoolAdapterStates, (k1, k2) -> k2));
-        for (Map.Entry<String, List<ThreadPoolAdapterState>> entry : newThreadPoolAdapterCacheConfigMap.entrySet()) {
-            String key = entry.getKey();
-            List<ThreadPoolAdapterState> newValue = entry.getValue();
-            List<ThreadPoolAdapterState> oldValue = oldThreadPoolAdapterCacheConfigMap.get(key);
-            if (oldValue == null) {
-                registerFlag = true;
-                break;
-            } else {
-                if (newValue.size() != oldValue.size()) {
-                    registerFlag = true;
-                    break;
-                }
-            }
-        }
-        return registerFlag;
     }
 }
